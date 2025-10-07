@@ -17,5 +17,7 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false
-  }
+  },
+  "include": ["src/**/*", "shared/**/*"],
+  "exclude": ["lambda", "node_modules", "dist"]
 }

@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: boomering-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: boomering
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - boomering-network
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: boomering-localstack
+    environment:
+      SERVICES: lambda,events,logs
+      DEBUG: 1
+      LAMBDA_EXECUTOR: docker-reuse
+      DOCKER_HOST: unix:///var/run/docker.sock
+    ports:
+      - '4566:4566'
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - './lambda/dist:/tmp/lambda'
+    networks:
+      - boomering-network
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+
+networks:
+  boomering-network:
+    driver: bridge
