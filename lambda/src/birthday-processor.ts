@@ -1,9 +1,13 @@
-import { Handler } from 'aws-lambda';
 import 'reflect-metadata';
 import { NotificationService, BirthdayService } from './services';
 import { FIFTEEN_MINUTES } from './constants/time';
 
-export const handler: Handler = async () => {
+interface LambdaResponse {
+  statusCode: number;
+  body: string;
+}
+
+export const handler = async (): Promise<LambdaResponse> => {
   console.log('Birthday processor triggered at:', new Date().toISOString());
 
   const birthdayService = new BirthdayService();
@@ -13,15 +17,15 @@ export const handler: Handler = async () => {
   await notificationService.init();
 
   const now = new Date();
-  const in15Min = new Date(now.getTime() + FIFTEEN_MINUTES);
+  const from15MinAgo = new Date(now.getTime() - FIFTEEN_MINUTES);
 
   console.log(
-    `Checking for birthdays between ${now.toISOString()} and ${in15Min.toISOString()}`,
+    `Checking for birthdays between ${from15MinAgo.toISOString()} and ${now.toISOString()}`,
   );
 
   const users = await birthdayService.getUsersWithUpcomingBirthdays(
+    from15MinAgo,
     now,
-    in15Min,
   );
 
   console.log(`Found ${users.length} users with upcoming birthdays`);
@@ -59,18 +63,18 @@ export const handler: Handler = async () => {
         user.nextBirthdayUtc,
         'sent',
       );
-
-      await birthdayService.updateUserNextBirthday(user);
-
-      console.log(
-        `Next birthday for user ${user.id}: ${user.nextBirthdayUtc.toISOString()}`,
-      );
     } catch (error) {
       console.error(`Failed to process user ${user.id}:`, error);
       await notificationService.logNotification(
         user.id,
         user.nextBirthdayUtc,
         'failed',
+      );
+    } finally {
+      await birthdayService.updateUserNextBirthday(user);
+
+      console.log(
+        `Next birthday for user ${user.id}: ${user.nextBirthdayUtc.toISOString()}`,
       );
     }
   }

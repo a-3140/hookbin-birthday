@@ -1,5 +1,12 @@
 import { DataSource } from 'typeorm';
 import { User, NotificationLog } from '@shared/entities';
+import {
+  DB_HOST,
+  DB_PORT,
+  DB_USERNAME,
+  DB_PASSWORD,
+  DB_DATABASE,
+} from '../config/constants';
 
 export class DatabaseService {
   private static instance: DatabaseService;
@@ -9,11 +16,11 @@ export class DatabaseService {
   private constructor() {
     this.dataSource = new DataSource({
       type: 'postgres',
-      host: process.env.DB_HOST,
-      port: parseInt(process.env.DB_PORT || '5432'),
-      username: process.env.DB_USERNAME,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_DATABASE,
+      host: DB_HOST,
+      port: DB_PORT,
+      username: DB_USERNAME,
+      password: DB_PASSWORD,
+      database: DB_DATABASE,
       entities: [User, NotificationLog],
       synchronize: false,
       logging: false,

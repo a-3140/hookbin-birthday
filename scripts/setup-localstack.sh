@@ -3,13 +3,13 @@ set -e
 
 echo "Building Lambda function..."
 cd lambda
-npm install
-npm run build
-npm run package
+pnpm install
+pnpm run build
+pnpm run package
 cd ..
 
 echo "Creating Lambda function in LocalStack..."
-aws --endpoint-url=http://localhost:4566 lambda create-function \
+aws --endpoint-url=http://localhost:4566 --region us-east-1 lambda create-function \
   --function-name birthday-processor \
   --runtime nodejs18.x \
   --handler index.handler \
@@ -17,16 +17,17 @@ aws --endpoint-url=http://localhost:4566 lambda create-function \
   --role arn:aws:iam::000000000000:role/lambda-role \
   --timeout 300 \
   --memory-size 512 \
-  --environment "Variables={DB_HOST=host.docker.internal,DB_PORT=5432,DB_USERNAME=postgres,DB_PASSWORD=postgres,DB_DATABASE=boomering,HOOKBIN_URL=https://hookb.in/YOUR_BIN_ID}"
+  --environment "Variables={DB_HOST=host.docker.internal,DB_PORT=5432,DB_USERNAME=postgres,DB_PASSWORD=postgres,DB_DATABASE=boomering,HOOKBIN_URL=https://eoi5vi6f2y827c6.m.pipedream.net}"
 
+## Every 15 minutes | in testing I'm using 1 minute
 echo "Creating EventBridge rule (every 15 minutes)..."
-aws --endpoint-url=http://localhost:4566 events put-rule \
+aws --endpoint-url=http://localhost:4566 --region us-east-1 events put-rule \
   --name birthday-check-every-15min \
-  --schedule-expression "cron(0/15 * * * ? *)" \
+  --schedule-expression "cron(0/1 * * * ? *)" \
   --state ENABLED
 
 echo "Adding Lambda as target..."
-aws --endpoint-url=http://localhost:4566 events put-targets \
+aws --endpoint-url=http://localhost:4566 --region us-east-1 events put-targets \
   --rule birthday-check-every-15min \
   --targets "Id=1,Arn=arn:aws:lambda:us-east-1:000000000000:function:birthday-processor"
 
