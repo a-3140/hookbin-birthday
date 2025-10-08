@@ -1,6 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
 
-@Entity()
+@Entity('user')
 export class User {
   @PrimaryGeneratedColumn()
   id: number;
@@ -11,7 +11,7 @@ export class User {
   @Column()
   lastName: string;
 
-  @Column()
+  @Column({ type: 'date' })
   birthDate: Date;
 
   @Column()
@@ -20,6 +20,6 @@ export class User {
   @Column()
   timezone: string;
 
-  @Column({ type: 'timestamp' })
+  @Column({ type: 'timestamptz' })
   nextBirthdayUtc: Date;
 }

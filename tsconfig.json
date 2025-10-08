@@ -16,8 +16,21 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    "paths": {
+      "@shared/*": [
+        "shared/*"
+      ]
+    },
   },
-  "include": ["src/**/*", "shared/**/*"],
-  "exclude": ["lambda", "node_modules", "dist"]
+  "include": [
+    "src/**/*",
+    "shared/**/*",
+    "test/**/*"
+  ],
+  "exclude": [
+    "lambda",
+    "node_modules",
+    "dist"
+  ]
 }

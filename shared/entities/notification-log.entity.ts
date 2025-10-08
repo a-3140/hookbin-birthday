@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 
-@Entity()
+@Entity('notification_log')
 @Index(['userId', 'type', 'scheduledFor'], { unique: true })
 export class NotificationLog {
   @PrimaryGeneratedColumn()
@@ -17,18 +17,18 @@ export class NotificationLog {
   @Column()
   userId: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user: User;
 
   @Column()
   type: 'birthday' | 'anniversary';
 
-  @Column({ type: 'timestamp' })
+  @Column({ type: 'timestamptz' })
   scheduledFor: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
-  sentAt: Date;
+  @Column({ type: 'timestamptz', nullable: true })
+  sentAt: Date | null;
 
   @Column({ default: 'sent' })
   status: 'sent' | 'failed';

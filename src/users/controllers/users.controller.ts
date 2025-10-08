@@ -1,6 +1,6 @@
-import { Controller, Logger, Post, Body, Delete } from '@nestjs/common';
+import { Controller, Logger, Post, Body, Delete, Param } from '@nestjs/common';
 import { UsersService } from '../services/users.service';
-import { RemoveUserDTO, UserCreateDTO } from '../dto/users.dto';
+import { UserCreateDTO } from '../dto/users.dto';
 
 @Controller('user')
 export class UsersController {
@@ -11,11 +11,17 @@ export class UsersController {
   async createUser(@Body() dto: UserCreateDTO) {
     this.logger.debug('Creating user...');
     await this.usersService.createUser(dto);
+    return {
+      message: 'User created',
+    };
   }
 
-  @Delete('/')
-  async removeUser(@Body() dto: RemoveUserDTO) {
+  @Delete('/:id')
+  async removeUser(@Param('id') id: string) {
     this.logger.debug('Removing user...');
-    await this.usersService.removeUser(dto);
+    await this.usersService.removeUser(id);
+    return {
+      message: 'User removed',
+    };
   }
 }

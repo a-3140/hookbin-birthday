@@ -1,7 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { RemoveUserDTO, UserCreateDTO } from '../dto/users.dto';
-import { User } from '../entities';
+import { UserCreateDTO } from '../dto/users.dto';
 import { Repository } from 'typeorm';
 import {
   getMonth,
@@ -16,6 +20,7 @@ import {
   addYears,
 } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { User } from '@shared/entities';
 
 @Injectable()
 export class UsersService {
@@ -25,21 +30,39 @@ export class UsersService {
   ) {}
 
   async createUser(dto: UserCreateDTO): Promise<User> {
-    this.logger.log('Creating user...');
-    const user = this.usersRepository.create(dto);
-    user.nextBirthdayUtc = this.calculateNextBirthdayUtc(
-      dto.birthDate,
-      dto.timezone,
-    );
-    return this.usersRepository.save(user);
+    try {
+      this.logger.log('Creating user...');
+      const user = this.usersRepository.create(dto);
+      user.nextBirthdayUtc = this.calculateNextBirthdayUtc(
+        dto.birthDate,
+        dto.timezone,
+      );
+      const saved = await this.usersRepository.save(user);
+      this.logger.log('User created');
+      return saved;
+    } catch (e) {
+      this.logger.error(e);
+      throw new InternalServerErrorException();
+    }
   }
 
-  async removeUser(dto: RemoveUserDTO) {
-    this.logger.log('Removing user...');
-    await this.usersRepository.delete(dto.id);
+  async removeUser(userId: string) {
+    try {
+      this.logger.log('Removing user...');
+      const result = await this.usersRepository.delete(userId);
+      if (result.affected === 0) {
+        throw new BadRequestException('User not found');
+      }
+    } catch (e) {
+      this.logger.error(e);
+      if (e instanceof BadRequestException) {
+        throw e;
+      }
+      throw new InternalServerErrorException();
+    }
   }
 
-  private calculateNextBirthdayUtc(birthDate: Date, timezone: string): Date {
+  private calculateNextBirthdayUtc(birthDate: string, timezone: string): Date {
     const birthMonth = getMonth(birthDate);
     const birthDay = getDate(birthDate);
 
@@ -47,7 +70,8 @@ export class UsersService {
 
     let nextBirthday = setMonth(now, birthMonth);
     nextBirthday = setDate(nextBirthday, birthDay);
-    nextBirthday = setHours(nextBirthday, 0);
+    // hour is the time of day
+    nextBirthday = setHours(nextBirthday, 9);
     nextBirthday = setMinutes(nextBirthday, 0);
     nextBirthday = setSeconds(nextBirthday, 0);
     nextBirthday = setMilliseconds(nextBirthday, 0);

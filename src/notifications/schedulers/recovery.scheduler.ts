@@ -1,13 +1,23 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, In } from 'typeorm';
-import { User } from '../../users/entities';
-import { NotificationLog } from '../entities';
+import { Repository, Between, In, LessThan } from 'typeorm';
 import { WebhookService } from '../services';
+import { NotificationLog, User } from '@shared/entities';
+import {
+  addYears,
+  setHours,
+  setMinutes,
+  setSeconds,
+  setMilliseconds,
+  getMonth,
+  getDate,
+  setMonth,
+  setDate,
+} from 'date-fns';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
 @Injectable()
-export class RecoveryScheduler {
+export class RecoveryScheduler implements OnModuleInit {
   private readonly logger = new Logger(RecoveryScheduler.name);
 
   constructor(
@@ -62,11 +72,64 @@ export class RecoveryScheduler {
     }
   }
 
-  @Cron('0 10 * * *')
-  async recoverMissedBirthdays() {
-    this.logger.log('Running recovery check for missed birthdays...');
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  private calculateNextBirthday(user: User): Date {
+    const birthMonth = getMonth(user.birthDate);
+    const birthDay = getDate(user.birthDate);
+
+    const now = toZonedTime(new Date(), user.timezone);
+
+    let nextBirthday = setMonth(now, birthMonth);
+    nextBirthday = setDate(nextBirthday, birthDay);
+    nextBirthday = setHours(nextBirthday, 0);
+    nextBirthday = setMinutes(nextBirthday, 0);
+    nextBirthday = setSeconds(nextBirthday, 0);
+    nextBirthday = setMilliseconds(nextBirthday, 0);
+
+    if (nextBirthday <= now) {
+      nextBirthday = addYears(nextBirthday, 1);
+    }
+
+    return fromZonedTime(nextBirthday, user.timezone);
+  }
+
+  async cleanupStuckBirthdays() {
+    this.logger.log('Running cleanup for stuck birthdays...');
     const now = new Date();
-    await this.recover(yesterday, now);
+    const lookbackHours = 26 * 60 * 60 * 1000;
+    const recoveryWindowStart = new Date(Date.now() - lookbackHours);
+
+    const stuckUsers = await this.usersRepository.find({
+      where: { nextBirthdayUtc: LessThan(recoveryWindowStart) },
+    });
+
+    if (stuckUsers.length === 0) {
+      this.logger.log('No stuck birthdays found');
+      return;
+    }
+
+    this.logger.warn(`Found ${stuckUsers.length} users with stuck birthdays`);
+
+    for (const user of stuckUsers) {
+      const newNextBirthday = this.calculateNextBirthday(user);
+      user.nextBirthdayUtc = newNextBirthday;
+      await this.usersRepository.save(user);
+      this.logger.log(
+        `Updated user ${user.id} nextBirthdayUtc to ${newNextBirthday.toISOString()}`,
+      );
+    }
+  }
+
+  async onModuleInit() {
+    this.logger.log(
+      'Running recovery check for missed birthdays on startup...',
+    );
+
+    await this.cleanupStuckBirthdays();
+
+    // 26 is the farthest between timezones
+    const lookbackHours = 26 * 60 * 60 * 1000;
+    const startDate = new Date(Date.now() - lookbackHours);
+    const now = new Date();
+    await this.recover(startDate, now);
   }
 }

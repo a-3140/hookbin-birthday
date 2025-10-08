@@ -11,7 +11,7 @@ export class UserCreateDTO {
 
   @IsDateString()
   @IsNotEmpty()
-  birthDate: Date;
+  birthDate: string;
 
   @IsString()
   @IsNotEmpty()
@@ -20,10 +20,4 @@ export class UserCreateDTO {
   @IsString()
   @IsNotEmpty()
   timezone: string;
-}
-
-export class RemoveUserDTO {
-  @IsString()
-  @IsNotEmpty()
-  id: string;
 }
