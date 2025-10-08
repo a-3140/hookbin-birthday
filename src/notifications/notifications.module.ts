@@ -4,11 +4,11 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { HttpModule } from '@nestjs/axios';
 import { WebhookService } from './services';
 import { RecoveryScheduler } from './schedulers';
-import { NotificationLog, User } from '@shared/entities';
+import { ScheduledNotification, User } from '@shared/entities';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([NotificationLog, User]),
+    TypeOrmModule.forFeature([ScheduledNotification, User]),
     ScheduleModule.forRoot(),
     HttpModule,
   ],

@@ -8,9 +8,9 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 
-@Entity('notification_log')
+@Entity('scheduled_notification')
 @Index(['userId', 'type', 'scheduledFor'], { unique: true })
-export class NotificationLog {
+export class ScheduledNotification {
   @PrimaryGeneratedColumn()
   id: number;
 

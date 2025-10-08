@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { RecoveryScheduler } from './recovery.scheduler';
 import { WebhookService } from '../services';
-import { NotificationLog, User } from '@shared/entities';
+import { ScheduledNotification, User } from '@shared/entities';
 
 describe('RecoveryScheduler', () => {
   let scheduler: RecoveryScheduler;
@@ -11,7 +11,7 @@ describe('RecoveryScheduler', () => {
     find: jest.fn(),
   };
 
-  const mockNotificationLogRepository = {
+  const mockScheduledNotificationRepository = {
     find: jest.fn(),
     save: jest.fn(),
   };
@@ -28,8 +28,8 @@ describe('RecoveryScheduler', () => {
         RecoveryScheduler,
         { provide: getRepositoryToken(User), useValue: mockUsersRepository },
         {
-          provide: getRepositoryToken(NotificationLog),
-          useValue: mockNotificationLogRepository,
+          provide: getRepositoryToken(ScheduledNotification),
+          useValue: mockScheduledNotificationRepository,
         },
         { provide: WebhookService, useValue: mockWebhookService },
       ],
@@ -52,7 +52,7 @@ describe('RecoveryScheduler', () => {
       await scheduler.recover(startDate, endDate);
 
       expect(mockUsersRepository.find).toHaveBeenCalled();
-      expect(mockNotificationLogRepository.find).not.toHaveBeenCalled();
+      expect(mockScheduledNotificationRepository.find).not.toHaveBeenCalled();
       expect(mockWebhookService.sendBirthdayMessage).not.toHaveBeenCalled();
     });
 
@@ -65,10 +65,10 @@ describe('RecoveryScheduler', () => {
       };
 
       mockUsersRepository.find.mockResolvedValue([missedUser as User]);
-      mockNotificationLogRepository.find.mockResolvedValue([]);
+      mockScheduledNotificationRepository.find.mockResolvedValue([]);
       mockWebhookService.sendBirthdayMessage.mockResolvedValue(undefined);
-      mockNotificationLogRepository.save.mockResolvedValue(
-        {} as NotificationLog,
+      mockScheduledNotificationRepository.save.mockResolvedValue(
+        {} as ScheduledNotification,
       );
 
       await scheduler.recover(startDate, endDate);
@@ -77,7 +77,7 @@ describe('RecoveryScheduler', () => {
         'John',
         'Doe',
       );
-      expect(mockNotificationLogRepository.save).toHaveBeenCalledWith(
+      expect(mockScheduledNotificationRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 1,
           type: 'birthday',
@@ -95,7 +95,7 @@ describe('RecoveryScheduler', () => {
         nextBirthdayUtc: new Date('2025-01-01T09:00:00Z'),
       };
 
-      const sentLog: Partial<NotificationLog> = {
+      const sentLog: Partial<ScheduledNotification> = {
         id: 1,
         userId: 1,
         scheduledFor: new Date('2025-01-01T09:00:00Z'),
@@ -103,14 +103,14 @@ describe('RecoveryScheduler', () => {
       };
 
       mockUsersRepository.find.mockResolvedValue([missedUser as User]);
-      mockNotificationLogRepository.find.mockResolvedValue([
-        sentLog as NotificationLog,
+      mockScheduledNotificationRepository.find.mockResolvedValue([
+        sentLog as ScheduledNotification,
       ]);
 
       await scheduler.recover(startDate, endDate);
 
       expect(mockWebhookService.sendBirthdayMessage).not.toHaveBeenCalled();
-      expect(mockNotificationLogRepository.save).not.toHaveBeenCalled();
+      expect(mockScheduledNotificationRepository.save).not.toHaveBeenCalled();
     });
 
     it('should handle multiple users with mixed states', async () => {
@@ -128,7 +128,7 @@ describe('RecoveryScheduler', () => {
         nextBirthdayUtc: new Date('2025-01-01T10:00:00Z'),
       };
 
-      const sentLog: Partial<NotificationLog> = {
+      const sentLog: Partial<ScheduledNotification> = {
         id: 1,
         userId: 1,
         scheduledFor: new Date('2025-01-01T09:00:00Z'),
@@ -139,12 +139,12 @@ describe('RecoveryScheduler', () => {
         user1 as User,
         user2 as User,
       ]);
-      mockNotificationLogRepository.find.mockResolvedValue([
-        sentLog as NotificationLog,
+      mockScheduledNotificationRepository.find.mockResolvedValue([
+        sentLog as ScheduledNotification,
       ]);
       mockWebhookService.sendBirthdayMessage.mockResolvedValue(undefined);
-      mockNotificationLogRepository.save.mockResolvedValue(
-        {} as NotificationLog,
+      mockScheduledNotificationRepository.save.mockResolvedValue(
+        {} as ScheduledNotification,
       );
 
       await scheduler.recover(startDate, endDate);
@@ -154,7 +154,7 @@ describe('RecoveryScheduler', () => {
         'Jane',
         'Smith',
       );
-      expect(mockNotificationLogRepository.save).toHaveBeenCalledTimes(1);
+      expect(mockScheduledNotificationRepository.save).toHaveBeenCalledTimes(1);
     });
 
     it('should continue processing other users if one fails', async () => {
@@ -176,18 +176,18 @@ describe('RecoveryScheduler', () => {
         user1 as User,
         user2 as User,
       ]);
-      mockNotificationLogRepository.find.mockResolvedValue([]);
+      mockScheduledNotificationRepository.find.mockResolvedValue([]);
       mockWebhookService.sendBirthdayMessage
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce(undefined);
-      mockNotificationLogRepository.save.mockResolvedValue(
-        {} as NotificationLog,
+      mockScheduledNotificationRepository.save.mockResolvedValue(
+        {} as ScheduledNotification,
       );
 
       await scheduler.recover(startDate, endDate);
 
       expect(mockWebhookService.sendBirthdayMessage).toHaveBeenCalledTimes(2);
-      expect(mockNotificationLogRepository.save).toHaveBeenCalledTimes(1);
+      expect(mockScheduledNotificationRepository.save).toHaveBeenCalledTimes(1);
     });
 
     it('should optimize queries by fetching logs in bulk', async () => {
@@ -213,16 +213,16 @@ describe('RecoveryScheduler', () => {
       ];
 
       mockUsersRepository.find.mockResolvedValue(users as User[]);
-      mockNotificationLogRepository.find.mockResolvedValue([]);
+      mockScheduledNotificationRepository.find.mockResolvedValue([]);
       mockWebhookService.sendBirthdayMessage.mockResolvedValue(undefined);
-      mockNotificationLogRepository.save.mockResolvedValue(
-        {} as NotificationLog,
+      mockScheduledNotificationRepository.save.mockResolvedValue(
+        {} as ScheduledNotification,
       );
 
       await scheduler.recover(startDate, endDate);
 
       expect(mockUsersRepository.find).toHaveBeenCalledTimes(1);
-      expect(mockNotificationLogRepository.find).toHaveBeenCalledTimes(1);
+      expect(mockScheduledNotificationRepository.find).toHaveBeenCalledTimes(1);
       expect(mockWebhookService.sendBirthdayMessage).toHaveBeenCalledTimes(3);
     });
   });

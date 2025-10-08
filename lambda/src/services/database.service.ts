@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { User, NotificationLog } from '@shared/entities';
+import { User, ScheduledNotification } from '@shared/entities';
 import {
   DB_HOST,
   DB_PORT,
@@ -21,7 +21,7 @@ export class DatabaseService {
       username: DB_USERNAME,
       password: DB_PASSWORD,
       database: DB_DATABASE,
-      entities: [User, NotificationLog],
+      entities: [User, ScheduledNotification],
       synchronize: false,
       logging: false,
     });
@@ -51,7 +51,7 @@ export class DatabaseService {
     return this.getDataSource().getRepository(User);
   }
 
-  getNotificationLogRepository() {
-    return this.getDataSource().getRepository(NotificationLog);
+  getScheduledNotificationRepository() {
+    return this.getDataSource().getRepository(ScheduledNotification);
   }
 }

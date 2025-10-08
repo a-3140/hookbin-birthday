@@ -1,2 +1,2 @@
 export * from './user.entity';
-export * from './notification-log.entity';
+export * from './scheduled-notification.entity';

@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UsersService } from './users.service';
-import { UserCreateDTO } from '../dto/users.dto';
+import { UserCreateDTO, UserUpdateDTO } from '../dto/users.dto';
 import { User } from '@shared/entities';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -12,6 +12,7 @@ describe('UsersService', () => {
     create: jest.fn(),
     save: jest.fn(),
     delete: jest.fn(),
+    findOne: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -137,6 +138,148 @@ describe('UsersService', () => {
       );
 
       expect(mockRepository.delete).toHaveBeenCalledWith('999');
+    });
+  });
+
+  describe('updateUser', () => {
+    it('should update user without recalculating nextBirthdayUtc when only name changes', async () => {
+      const existingUser: User = {
+        id: 1,
+        firstName: 'John',
+        lastName: 'Doe',
+        birthDate: new Date('1990-06-15'),
+        location: 'Sydney',
+        timezone: 'Australia/Sydney',
+        nextBirthdayUtc: new Date('2026-06-15T09:00:00Z'),
+      };
+
+      const dto: UserUpdateDTO = {
+        firstName: 'Jane',
+        lastName: 'Smith',
+      };
+
+      mockRepository.findOne.mockResolvedValue(existingUser);
+      mockRepository.save.mockResolvedValue({ ...existingUser, ...dto });
+
+      const result = await service.updateUser('1', dto);
+
+      expect(mockRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 1 },
+      });
+      expect(result.firstName).toBe('Jane');
+      expect(result.lastName).toBe('Smith');
+      expect(mockRepository.save).toHaveBeenCalled();
+    });
+
+    it('should recalculate nextBirthdayUtc when birthDate changes', async () => {
+      const originalNextBirthday = new Date('2026-06-15T09:00:00Z');
+      const existingUser: User = {
+        id: 1,
+        firstName: 'John',
+        lastName: 'Doe',
+        birthDate: new Date('1990-06-15'),
+        location: 'Sydney',
+        timezone: 'Australia/Sydney',
+        nextBirthdayUtc: originalNextBirthday,
+      };
+
+      const dto: UserUpdateDTO = {
+        birthDate: '1990-12-25',
+      };
+
+      mockRepository.findOne.mockResolvedValue(existingUser);
+      mockRepository.save.mockImplementation((user) => Promise.resolve(user));
+
+      await service.updateUser('1', dto);
+
+      expect(mockRepository.findOne).toHaveBeenCalled();
+      expect(mockRepository.save).toHaveBeenCalled();
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const savedUser = mockRepository.save.mock.calls[0][0] as User;
+      expect(savedUser.nextBirthdayUtc).toBeDefined();
+      expect(savedUser.nextBirthdayUtc).toBeInstanceOf(Date);
+      expect(savedUser.nextBirthdayUtc).not.toEqual(originalNextBirthday);
+    });
+
+    it('should recalculate nextBirthdayUtc when timezone changes', async () => {
+      const originalNextBirthday = new Date('2026-06-15T09:00:00Z');
+      const existingUser: User = {
+        id: 1,
+        firstName: 'John',
+        lastName: 'Doe',
+        birthDate: new Date('1990-06-15'),
+        location: 'Sydney',
+        timezone: 'Australia/Sydney',
+        nextBirthdayUtc: originalNextBirthday,
+      };
+
+      const dto: UserUpdateDTO = {
+        timezone: 'America/New_York',
+      };
+
+      mockRepository.findOne.mockResolvedValue(existingUser);
+      mockRepository.save.mockImplementation((user) => Promise.resolve(user));
+
+      await service.updateUser('1', dto);
+
+      expect(mockRepository.findOne).toHaveBeenCalled();
+      expect(mockRepository.save).toHaveBeenCalled();
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const savedUser = mockRepository.save.mock.calls[0][0] as User;
+      expect(savedUser.nextBirthdayUtc).toBeDefined();
+      expect(savedUser.nextBirthdayUtc).toBeInstanceOf(Date);
+      expect(savedUser.nextBirthdayUtc).not.toEqual(originalNextBirthday);
+    });
+
+    it('should recalculate nextBirthdayUtc when both birthDate and timezone change', async () => {
+      const originalNextBirthday = new Date('2026-06-15T09:00:00Z');
+      const existingUser: User = {
+        id: 1,
+        firstName: 'John',
+        lastName: 'Doe',
+        birthDate: new Date('1990-06-15'),
+        location: 'Sydney',
+        timezone: 'Australia/Sydney',
+        nextBirthdayUtc: originalNextBirthday,
+      };
+
+      const dto: UserUpdateDTO = {
+        birthDate: '1995-12-25',
+        timezone: 'Europe/London',
+      };
+
+      mockRepository.findOne.mockResolvedValue(existingUser);
+      mockRepository.save.mockImplementation((user) => Promise.resolve(user));
+
+      await service.updateUser('1', dto);
+
+      expect(mockRepository.findOne).toHaveBeenCalled();
+      expect(mockRepository.save).toHaveBeenCalled();
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const savedUser = mockRepository.save.mock.calls[0][0] as User;
+      expect(savedUser.nextBirthdayUtc).toBeDefined();
+      expect(savedUser.nextBirthdayUtc).toBeInstanceOf(Date);
+      expect(savedUser.nextBirthdayUtc).not.toEqual(originalNextBirthday);
+    });
+
+    it('should throw NotFoundException when user does not exist', async () => {
+      const dto: UserUpdateDTO = {
+        firstName: 'Jane',
+      };
+
+      mockRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.updateUser('999', dto)).rejects.toThrow(
+        NotFoundException,
+      );
+
+      expect(mockRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 999 },
+      });
+      expect(mockRepository.save).not.toHaveBeenCalled();
     });
   });
 });

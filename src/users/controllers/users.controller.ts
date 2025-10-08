@@ -1,6 +1,14 @@
-import { Controller, Logger, Post, Body, Delete, Param } from '@nestjs/common';
+import {
+  Controller,
+  Logger,
+  Post,
+  Body,
+  Delete,
+  Param,
+  Put,
+} from '@nestjs/common';
 import { UsersService } from '../services/users.service';
-import { UserCreateDTO } from '../dto/users.dto';
+import { UserCreateDTO, UserUpdateDTO } from '../dto/users.dto';
 
 @Controller('user')
 export class UsersController {
@@ -13,6 +21,16 @@ export class UsersController {
     await this.usersService.createUser(dto);
     return {
       message: 'User created',
+    };
+  }
+
+  @Put('/:id')
+  async updateUser(@Param('id') id: string, @Body() dto: UserUpdateDTO) {
+    this.logger.debug(`Updating user ${id}...`);
+    const user = await this.usersService.updateUser(id, dto);
+    return {
+      message: 'User updated',
+      data: user,
     };
   }
 

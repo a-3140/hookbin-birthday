@@ -1,4 +1,9 @@
-import { IsDateString, IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class UserCreateDTO {
   @IsString()
@@ -20,4 +25,26 @@ export class UserCreateDTO {
   @IsString()
   @IsNotEmpty()
   timezone: string;
+}
+
+export class UserUpdateDTO {
+  @IsString()
+  @IsOptional()
+  firstName?: string;
+
+  @IsString()
+  @IsOptional()
+  lastName?: string;
+
+  @IsDateString()
+  @IsOptional()
+  birthDate?: string;
+
+  @IsString()
+  @IsOptional()
+  location?: string;
+
+  @IsString()
+  @IsOptional()
+  timezone?: string;
 }

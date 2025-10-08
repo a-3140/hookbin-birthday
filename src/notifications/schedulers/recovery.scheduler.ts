@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, In, LessThan } from 'typeorm';
 import { WebhookService } from '../services';
-import { NotificationLog, User } from '@shared/entities';
+import { ScheduledNotification, User } from '@shared/entities';
 import {
   addYears,
   setHours,
@@ -23,8 +23,8 @@ export class RecoveryScheduler implements OnModuleInit {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
-    @InjectRepository(NotificationLog)
-    private readonly notificationLogRepository: Repository<NotificationLog>,
+    @InjectRepository(ScheduledNotification)
+    private readonly scheduledNotificationRepository: Repository<ScheduledNotification>,
     private readonly webhookService: WebhookService,
   ) {}
 
@@ -37,7 +37,7 @@ export class RecoveryScheduler implements OnModuleInit {
 
     const userIds = missedUsers.map((u) => u.id);
 
-    const sentLogs = await this.notificationLogRepository.find({
+    const sentLogs = await this.scheduledNotificationRepository.find({
       where: {
         userId: In(userIds),
         status: 'sent',
@@ -58,7 +58,7 @@ export class RecoveryScheduler implements OnModuleInit {
             user.firstName,
             user.lastName,
           );
-          await this.notificationLogRepository.save({
+          await this.scheduledNotificationRepository.save({
             userId: user.id,
             type: 'birthday',
             scheduledFor: user.nextBirthdayUtc,
