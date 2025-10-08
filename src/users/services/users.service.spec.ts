@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UsersService } from './users.service';
-import { UserCreateDTO, RemoveUserDTO } from '../dto/users.dto';
+import { UserCreateDTO } from '../dto/users.dto';
 import { User } from '@shared/entities';
+import { BadRequestException } from '@nestjs/common';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -35,7 +36,7 @@ describe('UsersService', () => {
       const dto: UserCreateDTO = {
         firstName: 'John',
         lastName: 'Doe',
-        birthDate: new Date('1990-06-15'),
+        birthDate: '1990-06-15',
         location: 'Sydney',
         timezone: 'Australia/Sydney',
       };
@@ -69,7 +70,7 @@ describe('UsersService', () => {
       const dto: UserCreateDTO = {
         firstName: 'Jane',
         lastName: 'Smith',
-        birthDate: new Date('1995-12-25'),
+        birthDate: '1995-12-25',
         location: 'Tokyo',
         timezone: 'Asia/Tokyo',
       };
@@ -93,7 +94,7 @@ describe('UsersService', () => {
       const dto: UserCreateDTO = {
         firstName: 'Test',
         lastName: 'User',
-        birthDate: new Date('1990-01-15'),
+        birthDate: '1990-01-15',
         location: 'Sydney',
         timezone: 'Australia/Sydney',
       };
@@ -120,22 +121,20 @@ describe('UsersService', () => {
 
   describe('removeUser', () => {
     it('should delete user by id', async () => {
-      const dto: RemoveUserDTO = { id: '999' };
-
       mockRepository.delete.mockResolvedValue({ affected: 1, raw: [] });
 
-      await service.removeUser(dto);
+      await service.removeUser('999');
 
       expect(mockRepository.delete).toHaveBeenCalledWith('999');
       expect(mockRepository.delete).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle deletion of non-existent user', async () => {
-      const dto: RemoveUserDTO = { id: '999' };
-
+    it('should throw BadRequestException for non-existent user', async () => {
       mockRepository.delete.mockResolvedValue({ affected: 0, raw: [] });
 
-      await service.removeUser(dto);
+      await expect(service.removeUser('999')).rejects.toThrow(
+        BadRequestException,
+      );
 
       expect(mockRepository.delete).toHaveBeenCalledWith('999');
     });
