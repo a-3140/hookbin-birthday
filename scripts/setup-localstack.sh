@@ -19,11 +19,10 @@ aws --endpoint-url=http://localhost:4566 --region us-east-1 lambda create-functi
   --memory-size 512 \
   --environment "Variables={DB_HOST=host.docker.internal,DB_PORT=5432,DB_USERNAME=postgres,DB_PASSWORD=postgres,DB_DATABASE=boomering,HOOKBIN_URL=https://eoi5vi6f2y827c6.m.pipedream.net}"
 
-## Every 15 minutes | in testing I'm using 1 minute
 echo "Creating EventBridge rule (every 15 minutes)..."
 aws --endpoint-url=http://localhost:4566 --region us-east-1 events put-rule \
   --name birthday-check-every-15min \
-  --schedule-expression "cron(0/1 * * * ? *)" \
+  --schedule-expression "cron(0/15 * * * ? *)" \
   --state ENABLED
 
 echo "Adding Lambda as target..."
