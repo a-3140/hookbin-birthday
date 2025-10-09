@@ -9,7 +9,7 @@ import {
 import { User } from './user.entity';
 
 @Entity('scheduled_notification')
-@Index(['userId', 'type', 'scheduledFor'], { unique: true })
+@Index(['userId', 'type'], { unique: true })
 export class ScheduledNotification {
   @PrimaryGeneratedColumn()
   id: number;
@@ -21,15 +21,12 @@ export class ScheduledNotification {
   @JoinColumn({ name: 'userId' })
   user: User;
 
-  @Column()
-  type: 'birthday' | 'anniversary';
+  @Column({ type: 'varchar', length: 50 })
+  type: string;
 
   @Column({ type: 'timestamptz' })
   scheduledFor: Date;
 
-  @Column({ type: 'timestamptz', nullable: true })
-  sentAt: Date | null;
-
-  @Column({ default: 'sent' })
-  status: 'sent' | 'failed';
+  @Column({ type: 'varchar', length: 20, default: 'pending' })
+  status: string;
 }

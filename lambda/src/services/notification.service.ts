@@ -1,12 +1,12 @@
 import axios from 'axios';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { ScheduledNotification } from '@shared/entities';
 import { DatabaseService } from './database.service';
 import { HOOKBIN_URL } from '../config/constants';
 
 export class NotificationService {
   private hookbinURL: string;
-  private logRepo!: Repository<ScheduledNotification>;
+  private scheduledNotificationRepo!: Repository<ScheduledNotification>;
 
   constructor() {
     this.hookbinURL = HOOKBIN_URL;
@@ -14,7 +14,7 @@ export class NotificationService {
 
   async init() {
     const db = await DatabaseService.getInstance();
-    this.logRepo = db.getScheduledNotificationRepository();
+    this.scheduledNotificationRepo = db.getScheduledNotificationRepository();
   }
 
   async sendBirthdayMessage(firstName: string, lastName: string) {
@@ -23,26 +23,10 @@ export class NotificationService {
     });
   }
 
-  async logNotification(
-    userId: number,
-    scheduledFor: Date,
+  async updateNotificationStatus(
+    notificationId: number,
     status: 'sent' | 'failed',
   ) {
-    await this.logRepo.save({
-      userId,
-      type: 'birthday',
-      scheduledFor,
-      sentAt: status === 'sent' ? new Date() : undefined,
-      status,
-    });
-  }
-
-  async getAlreadySentNotifications(userIds: number[]) {
-    return this.logRepo.find({
-      where: {
-        userId: In(userIds),
-        status: 'sent',
-      },
-    });
+    await this.scheduledNotificationRepo.update(notificationId, { status });
   }
 }

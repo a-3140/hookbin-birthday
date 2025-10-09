@@ -21,24 +21,35 @@ import {
   addYears,
 } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
-import { User } from '@shared/entities';
+import { User, ScheduledNotification } from '@shared/entities';
 
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
   constructor(
     @InjectRepository(User) private readonly usersRepository: Repository<User>,
+    @InjectRepository(ScheduledNotification)
+    private readonly scheduledNotificationRepository: Repository<ScheduledNotification>,
   ) {}
 
   async createUser(dto: UserCreateDTO): Promise<User> {
     try {
       this.logger.log('Creating user...');
       const user = this.usersRepository.create(dto);
-      user.nextBirthdayUtc = this.calculateNextBirthdayUtc(
+      const saved = await this.usersRepository.save(user);
+
+      const nextBirthdayUtc = this.calculateNextBirthdayUtc(
         dto.birthDate,
         dto.timezone,
       );
-      const saved = await this.usersRepository.save(user);
+
+      await this.scheduledNotificationRepository.save({
+        userId: saved.id,
+        type: 'birthday',
+        scheduledFor: nextBirthdayUtc,
+        status: 'pending',
+      });
+
       this.logger.log('User created');
       return saved;
     } catch (e) {
@@ -80,23 +91,42 @@ export class UsersService {
         dto.birthDate !== user.birthDate.toISOString().split('T')[0];
       const timezoneChanged = dto.timezone && dto.timezone !== user.timezone;
 
-      if (dto.firstName !== undefined) user.firstName = dto.firstName;
-      if (dto.lastName !== undefined) user.lastName = dto.lastName;
-      if (dto.location !== undefined) user.location = dto.location;
-      if (dto.birthDate !== undefined) user.birthDate = new Date(dto.birthDate);
-      if (dto.timezone !== undefined) user.timezone = dto.timezone;
+      const fieldMap: Record<string, (value: string) => string | Date> = {
+        firstName: (v) => v,
+        lastName: (v) => v,
+        location: (v) => v,
+        birthDate: (v) => new Date(v),
+        timezone: (v) => v,
+      };
 
-      if (birthDateChanged || timezoneChanged) {
-        this.logger.log(
-          'birthDate or timezone changed, recalculating nextBirthdayUtc',
-        );
-        user.nextBirthdayUtc = this.calculateNextBirthdayUtc(
-          user.birthDate.toISOString().split('T')[0],
-          user.timezone,
-        );
+      for (const [key, transform] of Object.entries(fieldMap)) {
+        const value = dto[key as keyof UserUpdateDTO];
+        if (value !== undefined) {
+          user[key] = transform(value);
+        }
       }
 
       const updated = await this.usersRepository.save(user);
+
+      if (birthDateChanged || timezoneChanged) {
+        this.logger.log(
+          'birthDate or timezone changed, recalculating scheduledFor',
+        );
+
+        const birthdayNotification =
+          await this.scheduledNotificationRepository.findOne({
+            where: { userId: user.id, type: 'birthday' },
+          });
+
+        if (birthdayNotification) {
+          birthdayNotification.scheduledFor = this.calculateNextBirthdayUtc(
+            user.birthDate.toISOString().split('T')[0],
+            user.timezone,
+          );
+          await this.scheduledNotificationRepository.save(birthdayNotification);
+        }
+      }
+
       this.logger.log('User updated');
       return updated;
     } catch (e) {
@@ -117,8 +147,8 @@ export class UsersService {
     let nextBirthday = setMonth(now, birthMonth);
     nextBirthday = setDate(nextBirthday, birthDay);
     // hour is the time of day
-    nextBirthday = setHours(nextBirthday, 9);
-    nextBirthday = setMinutes(nextBirthday, 0);
+    nextBirthday = setHours(nextBirthday, 3);
+    nextBirthday = setMinutes(nextBirthday, 13);
     nextBirthday = setSeconds(nextBirthday, 0);
     nextBirthday = setMilliseconds(nextBirthday, 0);
 

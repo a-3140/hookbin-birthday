@@ -19,7 +19,4 @@ export class User {
 
   @Column()
   timezone: string;
-
-  @Column({ type: 'timestamptz' })
-  nextBirthdayUtc: Date;
 }

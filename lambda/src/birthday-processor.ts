@@ -23,61 +23,38 @@ export const handler = async (): Promise<LambdaResponse> => {
     `Checking for birthdays between ${from15MinAgo.toISOString()} and ${now.toISOString()}`,
   );
 
-  const users = await birthdayService.getUsersWithUpcomingBirthdays(
-    from15MinAgo,
-    now,
-  );
+  const notifications =
+    await birthdayService.getPendingNotifications(from15MinAgo, now);
 
-  console.log(`Found ${users.length} users with upcoming birthdays`);
+  console.log(`Found ${notifications.length} pending birthday notifications`);
 
-  if (users.length === 0) {
+  if (notifications.length === 0) {
     return { statusCode: 200, body: JSON.stringify({ processed: 0 }) };
   }
 
-  const userIds = users.map((u) => u.id);
-  const sentLogs =
-    await notificationService.getAlreadySentNotifications(userIds);
-
-  const sentUserIds = new Set(
-    sentLogs.map((log) => `${log.userId}-${log.scheduledFor.getTime()}`),
-  );
-
-  for (const user of users) {
-    const logKey = `${user.id}-${user.nextBirthdayUtc.getTime()}`;
-
-    if (sentUserIds.has(logKey)) {
-      console.log(`Skipping user ${user.id} - already sent`);
-      continue;
-    }
-
+  for (const notification of notifications) {
     try {
       await notificationService.sendBirthdayMessage(
-        user.firstName,
-        user.lastName,
+        notification.user.firstName,
+        notification.user.lastName,
       );
-
-      console.log(`Birthday message sent for user ${user.id}`);
-
-      await notificationService.logNotification(
-        user.id,
-        user.nextBirthdayUtc,
-        'sent',
-      );
-    } catch (error) {
-      console.error(`Failed to process user ${user.id}:`, error);
-      await notificationService.logNotification(
-        user.id,
-        user.nextBirthdayUtc,
-        'failed',
-      );
-    } finally {
-      await birthdayService.updateUserNextBirthday(user);
 
       console.log(
-        `Next birthday for user ${user.id}: ${user.nextBirthdayUtc.toISOString()}`,
+        `Birthday message sent for user ${notification.user.id} (notification ${notification.id})`,
       );
+
+      await notificationService.updateNotificationStatus(notification.id, 'sent');
+    } catch (error) {
+      console.error(
+        `Failed to process notification ${notification.id}:`,
+        error,
+      );
+      await notificationService.updateNotificationStatus(notification.id, 'failed');
     }
   }
 
-  return { statusCode: 200, body: JSON.stringify({ processed: users.length }) };
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ processed: notifications.length }),
+  };
 };

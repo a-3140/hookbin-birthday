@@ -7,10 +7,6 @@ import { ScheduledNotification, User } from '@shared/entities';
 describe('RecoveryScheduler', () => {
   let scheduler: RecoveryScheduler;
 
-  const mockUsersRepository = {
-    find: jest.fn(),
-  };
-
   const mockScheduledNotificationRepository = {
     find: jest.fn(),
     save: jest.fn(),
@@ -26,7 +22,6 @@ describe('RecoveryScheduler', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RecoveryScheduler,
-        { provide: getRepositoryToken(User), useValue: mockUsersRepository },
         {
           provide: getRepositoryToken(ScheduledNotification),
           useValue: mockScheduledNotificationRepository,
@@ -46,29 +41,39 @@ describe('RecoveryScheduler', () => {
     const startDate = new Date('2025-01-01T00:00:00Z');
     const endDate = new Date('2025-01-02T00:00:00Z');
 
-    it('should return early if no missed users found', async () => {
-      mockUsersRepository.find.mockResolvedValue([]);
+    it('should return early if no missed notifications found', async () => {
+      mockScheduledNotificationRepository.find.mockResolvedValue([]);
 
       await scheduler.recover(startDate, endDate);
 
-      expect(mockUsersRepository.find).toHaveBeenCalled();
-      expect(mockScheduledNotificationRepository.find).not.toHaveBeenCalled();
+      expect(mockScheduledNotificationRepository.find).toHaveBeenCalled();
       expect(mockWebhookService.sendBirthdayMessage).not.toHaveBeenCalled();
     });
 
-    it('should recover missed birthday for user without notification log', async () => {
-      const missedUser: Partial<User> = {
+    it('should recover missed birthday notification', async () => {
+      const user: Partial<User> = {
         id: 1,
         firstName: 'John',
         lastName: 'Doe',
-        nextBirthdayUtc: new Date('2025-01-01T09:00:00Z'),
+        birthDate: new Date('1990-06-15'),
+        timezone: 'Australia/Sydney',
       };
 
-      mockUsersRepository.find.mockResolvedValue([missedUser as User]);
-      mockScheduledNotificationRepository.find.mockResolvedValue([]);
+      const missedNotification: Partial<ScheduledNotification> = {
+        id: 1,
+        userId: 1,
+        type: 'birthday',
+        scheduledFor: new Date('2025-01-01T09:00:00Z'),
+        status: 'pending',
+        user: user as User,
+      };
+
+      mockScheduledNotificationRepository.find.mockResolvedValue([
+        missedNotification as ScheduledNotification,
+      ]);
       mockWebhookService.sendBirthdayMessage.mockResolvedValue(undefined);
       mockScheduledNotificationRepository.save.mockResolvedValue(
-        {} as ScheduledNotification,
+        missedNotification as ScheduledNotification,
       );
 
       await scheduler.recover(startDate, endDate);
@@ -79,33 +84,13 @@ describe('RecoveryScheduler', () => {
       );
       expect(mockScheduledNotificationRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          userId: 1,
-          type: 'birthday',
-          scheduledFor: missedUser.nextBirthdayUtc,
           status: 'sent',
         }),
       );
     });
 
-    it('should skip user if notification already sent', async () => {
-      const missedUser: Partial<User> = {
-        id: 1,
-        firstName: 'John',
-        lastName: 'Doe',
-        nextBirthdayUtc: new Date('2025-01-01T09:00:00Z'),
-      };
-
-      const sentLog: Partial<ScheduledNotification> = {
-        id: 1,
-        userId: 1,
-        scheduledFor: new Date('2025-01-01T09:00:00Z'),
-        status: 'sent',
-      };
-
-      mockUsersRepository.find.mockResolvedValue([missedUser as User]);
-      mockScheduledNotificationRepository.find.mockResolvedValue([
-        sentLog as ScheduledNotification,
-      ]);
+    it('should skip notification if already sent', async () => {
+      mockScheduledNotificationRepository.find.mockResolvedValue([]);
 
       await scheduler.recover(startDate, endDate);
 
@@ -113,34 +98,44 @@ describe('RecoveryScheduler', () => {
       expect(mockScheduledNotificationRepository.save).not.toHaveBeenCalled();
     });
 
-    it('should handle multiple users with mixed states', async () => {
+    it('should handle multiple notifications', async () => {
       const user1: Partial<User> = {
         id: 1,
         firstName: 'John',
         lastName: 'Doe',
-        nextBirthdayUtc: new Date('2025-01-01T09:00:00Z'),
+        birthDate: new Date('1990-06-15'),
+        timezone: 'Australia/Sydney',
       };
 
       const user2: Partial<User> = {
         id: 2,
         firstName: 'Jane',
         lastName: 'Smith',
-        nextBirthdayUtc: new Date('2025-01-01T10:00:00Z'),
+        birthDate: new Date('1995-12-25'),
+        timezone: 'America/New_York',
       };
 
-      const sentLog: Partial<ScheduledNotification> = {
+      const notification1: Partial<ScheduledNotification> = {
         id: 1,
         userId: 1,
+        type: 'birthday',
         scheduledFor: new Date('2025-01-01T09:00:00Z'),
-        status: 'sent',
+        status: 'pending',
+        user: user1 as User,
       };
 
-      mockUsersRepository.find.mockResolvedValue([
-        user1 as User,
-        user2 as User,
-      ]);
+      const notification2: Partial<ScheduledNotification> = {
+        id: 2,
+        userId: 2,
+        type: 'birthday',
+        scheduledFor: new Date('2025-01-01T10:00:00Z'),
+        status: 'pending',
+        user: user2 as User,
+      };
+
       mockScheduledNotificationRepository.find.mockResolvedValue([
-        sentLog as ScheduledNotification,
+        notification1 as ScheduledNotification,
+        notification2 as ScheduledNotification,
       ]);
       mockWebhookService.sendBirthdayMessage.mockResolvedValue(undefined);
       mockScheduledNotificationRepository.save.mockResolvedValue(
@@ -149,34 +144,57 @@ describe('RecoveryScheduler', () => {
 
       await scheduler.recover(startDate, endDate);
 
-      expect(mockWebhookService.sendBirthdayMessage).toHaveBeenCalledTimes(1);
+      expect(mockWebhookService.sendBirthdayMessage).toHaveBeenCalledTimes(2);
+      expect(mockWebhookService.sendBirthdayMessage).toHaveBeenCalledWith(
+        'John',
+        'Doe',
+      );
       expect(mockWebhookService.sendBirthdayMessage).toHaveBeenCalledWith(
         'Jane',
         'Smith',
       );
-      expect(mockScheduledNotificationRepository.save).toHaveBeenCalledTimes(1);
+      expect(mockScheduledNotificationRepository.save).toHaveBeenCalledTimes(2);
     });
 
-    it('should continue processing other users if one fails', async () => {
+    it('should continue processing other notifications if one fails', async () => {
       const user1: Partial<User> = {
         id: 1,
         firstName: 'John',
         lastName: 'Doe',
-        nextBirthdayUtc: new Date('2025-01-01T09:00:00Z'),
+        birthDate: new Date('1990-06-15'),
+        timezone: 'Australia/Sydney',
       };
 
       const user2: Partial<User> = {
         id: 2,
         firstName: 'Jane',
         lastName: 'Smith',
-        nextBirthdayUtc: new Date('2025-01-01T10:00:00Z'),
+        birthDate: new Date('1995-12-25'),
+        timezone: 'America/New_York',
       };
 
-      mockUsersRepository.find.mockResolvedValue([
-        user1 as User,
-        user2 as User,
+      const notification1: Partial<ScheduledNotification> = {
+        id: 1,
+        userId: 1,
+        type: 'birthday',
+        scheduledFor: new Date('2025-01-01T09:00:00Z'),
+        status: 'pending',
+        user: user1 as User,
+      };
+
+      const notification2: Partial<ScheduledNotification> = {
+        id: 2,
+        userId: 2,
+        type: 'birthday',
+        scheduledFor: new Date('2025-01-01T10:00:00Z'),
+        status: 'pending',
+        user: user2 as User,
+      };
+
+      mockScheduledNotificationRepository.find.mockResolvedValue([
+        notification1 as ScheduledNotification,
+        notification2 as ScheduledNotification,
       ]);
-      mockScheduledNotificationRepository.find.mockResolvedValue([]);
       mockWebhookService.sendBirthdayMessage
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce(undefined);
@@ -190,30 +208,61 @@ describe('RecoveryScheduler', () => {
       expect(mockScheduledNotificationRepository.save).toHaveBeenCalledTimes(1);
     });
 
-    it('should optimize queries by fetching logs in bulk', async () => {
-      const users = [
+    it('should process multiple notifications efficiently', async () => {
+      const user1: Partial<User> = {
+        id: 1,
+        firstName: 'User1',
+        lastName: 'Test',
+        birthDate: new Date('1990-01-15'),
+        timezone: 'Australia/Sydney',
+      };
+
+      const user2: Partial<User> = {
+        id: 2,
+        firstName: 'User2',
+        lastName: 'Test',
+        birthDate: new Date('1991-02-20'),
+        timezone: 'America/New_York',
+      };
+
+      const user3: Partial<User> = {
+        id: 3,
+        firstName: 'User3',
+        lastName: 'Test',
+        birthDate: new Date('1992-03-25'),
+        timezone: 'Europe/London',
+      };
+
+      const notifications = [
         {
           id: 1,
-          firstName: 'User1',
-          lastName: 'Test',
-          nextBirthdayUtc: new Date('2025-01-01T09:00:00Z'),
+          userId: 1,
+          type: 'birthday',
+          scheduledFor: new Date('2025-01-01T09:00:00Z'),
+          status: 'pending',
+          user: user1 as User,
         },
         {
           id: 2,
-          firstName: 'User2',
-          lastName: 'Test',
-          nextBirthdayUtc: new Date('2025-01-01T10:00:00Z'),
+          userId: 2,
+          type: 'birthday',
+          scheduledFor: new Date('2025-01-01T10:00:00Z'),
+          status: 'pending',
+          user: user2 as User,
         },
         {
           id: 3,
-          firstName: 'User3',
-          lastName: 'Test',
-          nextBirthdayUtc: new Date('2025-01-01T11:00:00Z'),
+          userId: 3,
+          type: 'birthday',
+          scheduledFor: new Date('2025-01-01T11:00:00Z'),
+          status: 'pending',
+          user: user3 as User,
         },
       ];
 
-      mockUsersRepository.find.mockResolvedValue(users as User[]);
-      mockScheduledNotificationRepository.find.mockResolvedValue([]);
+      mockScheduledNotificationRepository.find.mockResolvedValue(
+        notifications as ScheduledNotification[],
+      );
       mockWebhookService.sendBirthdayMessage.mockResolvedValue(undefined);
       mockScheduledNotificationRepository.save.mockResolvedValue(
         {} as ScheduledNotification,
@@ -221,9 +270,9 @@ describe('RecoveryScheduler', () => {
 
       await scheduler.recover(startDate, endDate);
 
-      expect(mockUsersRepository.find).toHaveBeenCalledTimes(1);
       expect(mockScheduledNotificationRepository.find).toHaveBeenCalledTimes(1);
       expect(mockWebhookService.sendBirthdayMessage).toHaveBeenCalledTimes(3);
+      expect(mockScheduledNotificationRepository.save).toHaveBeenCalledTimes(3);
     });
   });
 });

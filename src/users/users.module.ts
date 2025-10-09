@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { UsersService } from './services';
 import { UsersController } from './controllers';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from 'shared/entities';
+import { User, ScheduledNotification } from '@shared/entities';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User])],
+  imports: [TypeOrmModule.forFeature([User, ScheduledNotification])],
   providers: [UsersService],
   controllers: [UsersController],
 })

@@ -10,21 +10,22 @@ jest.mock('axios');
 
 describe('NotificationService', () => {
   let service: NotificationService;
-  let mockLogRepo: jest.Mocked<Repository<ScheduledNotification>>;
+  let mockScheduledNotificationRepo: jest.Mocked<
+    Repository<ScheduledNotification>
+  >;
   let mockHookbinUrl: string;
 
   beforeEach(async () => {
     mockHookbinUrl = HOOKBIN_URL;
 
-    mockLogRepo = {
-      save: jest.fn(),
-      find: jest.fn(),
+    mockScheduledNotificationRepo = {
+      update: jest.fn(),
     } as unknown as jest.Mocked<Repository<ScheduledNotification>>;
 
     const mockDbService = {
       getScheduledNotificationRepository: jest
         .fn()
-        .mockReturnValue(mockLogRepo),
+        .mockReturnValue(mockScheduledNotificationRepo),
     };
 
     (DatabaseService.getInstance as jest.Mock).mockResolvedValue(mockDbService);
@@ -50,6 +51,36 @@ describe('NotificationService', () => {
         message: "Hey, John Doe it's your birthday",
       });
       expect(postSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('updateNotificationStatus', () => {
+    it('should update notification status to sent', async () => {
+      const updateSpy = jest
+        .spyOn(mockScheduledNotificationRepo, 'update')
+        .mockResolvedValue({
+          affected: 1,
+        } as never);
+
+      await service.updateNotificationStatus(1, 'sent');
+
+      expect(updateSpy).toHaveBeenCalledWith(1, {
+        status: 'sent',
+      });
+    });
+
+    it('should update notification status to failed', async () => {
+      const updateSpy = jest
+        .spyOn(mockScheduledNotificationRepo, 'update')
+        .mockResolvedValue({
+          affected: 1,
+        } as never);
+
+      await service.updateNotificationStatus(1, 'failed');
+
+      expect(updateSpy).toHaveBeenCalledWith(1, {
+        status: 'failed',
+      });
     });
   });
 });

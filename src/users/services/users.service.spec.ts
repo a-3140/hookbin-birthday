@@ -2,16 +2,21 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UsersService } from './users.service';
 import { UserCreateDTO, UserUpdateDTO } from '../dto/users.dto';
-import { User } from '@shared/entities';
+import { User, ScheduledNotification } from '@shared/entities';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 describe('UsersService', () => {
   let service: UsersService;
 
-  const mockRepository = {
+  const mockUserRepository = {
     create: jest.fn(),
     save: jest.fn(),
     delete: jest.fn(),
+    findOne: jest.fn(),
+  };
+
+  const mockScheduledNotificationRepository = {
+    save: jest.fn(),
     findOne: jest.fn(),
   };
 
@@ -21,7 +26,11 @@ describe('UsersService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
-        { provide: getRepositoryToken(User), useValue: mockRepository },
+        { provide: getRepositoryToken(User), useValue: mockUserRepository },
+        {
+          provide: getRepositoryToken(ScheduledNotification),
+          useValue: mockScheduledNotificationRepository,
+        },
       ],
     }).compile();
 
@@ -33,7 +42,7 @@ describe('UsersService', () => {
   });
 
   describe('createUser', () => {
-    it('should create user with calculated nextBirthdayUtc', async () => {
+    it('should create user and scheduled notification', async () => {
       const dto: UserCreateDTO = {
         firstName: 'John',
         lastName: 'Doe',
@@ -45,26 +54,32 @@ describe('UsersService', () => {
       const createdUser = {
         ...dto,
         id: 1,
-        nextBirthdayUtc: new Date(),
+        birthDate: new Date(dto.birthDate),
       };
 
-      mockRepository.create.mockReturnValue(createdUser);
-      mockRepository.save.mockResolvedValue(createdUser);
+      mockUserRepository.create.mockReturnValue(createdUser);
+      mockUserRepository.save.mockResolvedValue(createdUser);
+      mockScheduledNotificationRepository.save.mockResolvedValue({
+        id: 1,
+        userId: 1,
+        type: 'birthday',
+        scheduledFor: new Date(),
+        status: 'pending',
+      });
 
       const result = await service.createUser(dto);
 
-      expect(mockRepository.create).toHaveBeenCalledWith(dto);
-      expect(result.nextBirthdayUtc).toBeDefined();
-      expect(mockRepository.save).toHaveBeenCalledWith(
+      expect(mockUserRepository.create).toHaveBeenCalledWith(dto);
+      expect(mockUserRepository.save).toHaveBeenCalled();
+      expect(mockScheduledNotificationRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          firstName: 'John',
-          lastName: 'Doe',
+          userId: 1,
+          type: 'birthday',
+          status: 'pending',
+          scheduledFor: expect.any(Date),
         }),
       );
-
-      const calls = mockRepository.save.mock.calls as Array<[User]>;
-      const savedUser = calls[0]?.[0];
-      expect(savedUser?.nextBirthdayUtc).toBeInstanceOf(Date);
+      expect(result).toEqual(createdUser);
     });
 
     it('should handle different timezones correctly', async () => {
@@ -79,19 +94,32 @@ describe('UsersService', () => {
       const createdUser = {
         ...dto,
         id: 2,
-        nextBirthdayUtc: new Date(),
+        birthDate: new Date(dto.birthDate),
       };
 
-      mockRepository.create.mockReturnValue(createdUser);
-      mockRepository.save.mockResolvedValue(createdUser);
+      mockUserRepository.create.mockReturnValue(createdUser);
+      mockUserRepository.save.mockResolvedValue(createdUser);
+      mockScheduledNotificationRepository.save.mockResolvedValue({
+        id: 2,
+        userId: 2,
+        type: 'birthday',
+        scheduledFor: new Date(),
+        status: 'pending',
+      });
 
-      const result = await service.createUser(dto);
+      await service.createUser(dto);
 
-      expect(result.nextBirthdayUtc).toBeDefined();
-      expect(result.nextBirthdayUtc).toBeInstanceOf(Date);
+      expect(mockScheduledNotificationRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 2,
+          type: 'birthday',
+          status: 'pending',
+          scheduledFor: expect.any(Date),
+        }),
+      );
     });
 
-    it('should calculate nextBirthdayUtc correctly', async () => {
+    it('should calculate scheduledFor correctly', async () => {
       const dto: UserCreateDTO = {
         firstName: 'Test',
         lastName: 'User',
@@ -103,46 +131,53 @@ describe('UsersService', () => {
       const createdUser = {
         ...dto,
         id: 3,
-        nextBirthdayUtc: new Date(),
+        birthDate: new Date(dto.birthDate),
       };
 
-      mockRepository.create.mockReturnValue(createdUser);
-      mockRepository.save.mockResolvedValue(createdUser);
+      mockUserRepository.create.mockReturnValue(createdUser);
+      mockUserRepository.save.mockResolvedValue(createdUser);
+      mockScheduledNotificationRepository.save.mockResolvedValue({
+        id: 3,
+        userId: 3,
+        type: 'birthday',
+        scheduledFor: new Date(),
+        status: 'pending',
+      });
 
       await service.createUser(dto);
 
-      expect(mockRepository.save).toHaveBeenCalled();
-
-      const calls = mockRepository.save.mock.calls as Array<[User]>;
-      const savedUser = calls[0]?.[0];
-      expect(savedUser?.nextBirthdayUtc).toBeDefined();
-      expect(savedUser?.nextBirthdayUtc).toBeInstanceOf(Date);
+      expect(mockScheduledNotificationRepository.save).toHaveBeenCalled();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const savedNotification = mockScheduledNotificationRepository.save.mock
+        .calls[0][0] as ScheduledNotification;
+      expect(savedNotification.scheduledFor).toBeDefined();
+      expect(savedNotification.scheduledFor).toBeInstanceOf(Date);
     });
   });
 
   describe('removeUser', () => {
     it('should delete user by id', async () => {
-      mockRepository.delete.mockResolvedValue({ affected: 1, raw: [] });
+      mockUserRepository.delete.mockResolvedValue({ affected: 1, raw: [] });
 
       await service.removeUser('999');
 
-      expect(mockRepository.delete).toHaveBeenCalledWith('999');
-      expect(mockRepository.delete).toHaveBeenCalledTimes(1);
+      expect(mockUserRepository.delete).toHaveBeenCalledWith('999');
+      expect(mockUserRepository.delete).toHaveBeenCalledTimes(1);
     });
 
     it('should throw BadRequestException for non-existent user', async () => {
-      mockRepository.delete.mockResolvedValue({ affected: 0, raw: [] });
+      mockUserRepository.delete.mockResolvedValue({ affected: 0, raw: [] });
 
       await expect(service.removeUser('999')).rejects.toThrow(
         BadRequestException,
       );
 
-      expect(mockRepository.delete).toHaveBeenCalledWith('999');
+      expect(mockUserRepository.delete).toHaveBeenCalledWith('999');
     });
   });
 
   describe('updateUser', () => {
-    it('should update user without recalculating nextBirthdayUtc when only name changes', async () => {
+    it('should update user without updating notification when only name changes', async () => {
       const existingUser: User = {
         id: 1,
         firstName: 'John',
@@ -150,7 +185,6 @@ describe('UsersService', () => {
         birthDate: new Date('1990-06-15'),
         location: 'Sydney',
         timezone: 'Australia/Sydney',
-        nextBirthdayUtc: new Date('2026-06-15T09:00:00Z'),
       };
 
       const dto: UserUpdateDTO = {
@@ -158,21 +192,27 @@ describe('UsersService', () => {
         lastName: 'Smith',
       };
 
-      mockRepository.findOne.mockResolvedValue(existingUser);
-      mockRepository.save.mockResolvedValue({ ...existingUser, ...dto });
+      mockUserRepository.findOne.mockResolvedValue(existingUser);
+      mockUserRepository.save.mockResolvedValue({
+        ...existingUser,
+        firstName: 'Jane',
+        lastName: 'Smith',
+      });
 
       const result = await service.updateUser('1', dto);
 
-      expect(mockRepository.findOne).toHaveBeenCalledWith({
+      expect(mockUserRepository.findOne).toHaveBeenCalledWith({
         where: { id: 1 },
       });
       expect(result.firstName).toBe('Jane');
       expect(result.lastName).toBe('Smith');
-      expect(mockRepository.save).toHaveBeenCalled();
+      expect(mockUserRepository.save).toHaveBeenCalled();
+      expect(
+        mockScheduledNotificationRepository.findOne,
+      ).not.toHaveBeenCalled();
     });
 
-    it('should recalculate nextBirthdayUtc when birthDate changes', async () => {
-      const originalNextBirthday = new Date('2026-06-15T09:00:00Z');
+    it('should update notification scheduledFor when birthDate changes', async () => {
       const existingUser: User = {
         id: 1,
         firstName: 'John',
@@ -180,30 +220,49 @@ describe('UsersService', () => {
         birthDate: new Date('1990-06-15'),
         location: 'Sydney',
         timezone: 'Australia/Sydney',
-        nextBirthdayUtc: originalNextBirthday,
+      };
+
+      const existingNotification: ScheduledNotification = {
+        id: 1,
+        userId: 1,
+        type: 'birthday',
+        scheduledFor: new Date('2026-06-15T09:00:00Z'),
+        status: 'pending',
+        user: existingUser,
       };
 
       const dto: UserUpdateDTO = {
         birthDate: '1990-12-25',
       };
 
-      mockRepository.findOne.mockResolvedValue(existingUser);
-      mockRepository.save.mockImplementation((user) => Promise.resolve(user));
+      mockUserRepository.findOne.mockResolvedValue(existingUser);
+      mockUserRepository.save.mockImplementation((user) =>
+        Promise.resolve(user),
+      );
+      mockScheduledNotificationRepository.findOne.mockResolvedValue(
+        existingNotification,
+      );
+      mockScheduledNotificationRepository.save.mockResolvedValue(
+        existingNotification,
+      );
 
       await service.updateUser('1', dto);
 
-      expect(mockRepository.findOne).toHaveBeenCalled();
-      expect(mockRepository.save).toHaveBeenCalled();
+      expect(mockUserRepository.findOne).toHaveBeenCalled();
+      expect(mockUserRepository.save).toHaveBeenCalled();
+      expect(mockScheduledNotificationRepository.findOne).toHaveBeenCalledWith({
+        where: { userId: 1, type: 'birthday' },
+      });
+      expect(mockScheduledNotificationRepository.save).toHaveBeenCalled();
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      const savedUser = mockRepository.save.mock.calls[0][0] as User;
-      expect(savedUser.nextBirthdayUtc).toBeDefined();
-      expect(savedUser.nextBirthdayUtc).toBeInstanceOf(Date);
-      expect(savedUser.nextBirthdayUtc).not.toEqual(originalNextBirthday);
+      const savedNotification = mockScheduledNotificationRepository.save.mock
+        .calls[0][0] as ScheduledNotification;
+      expect(savedNotification.scheduledFor).toBeDefined();
+      expect(savedNotification.scheduledFor).toBeInstanceOf(Date);
     });
 
-    it('should recalculate nextBirthdayUtc when timezone changes', async () => {
-      const originalNextBirthday = new Date('2026-06-15T09:00:00Z');
+    it('should update notification scheduledFor when timezone changes', async () => {
       const existingUser: User = {
         id: 1,
         firstName: 'John',
@@ -211,30 +270,41 @@ describe('UsersService', () => {
         birthDate: new Date('1990-06-15'),
         location: 'Sydney',
         timezone: 'Australia/Sydney',
-        nextBirthdayUtc: originalNextBirthday,
+      };
+
+      const existingNotification: ScheduledNotification = {
+        id: 1,
+        userId: 1,
+        type: 'birthday',
+        scheduledFor: new Date('2026-06-15T09:00:00Z'),
+        status: 'pending',
+        user: existingUser,
       };
 
       const dto: UserUpdateDTO = {
         timezone: 'America/New_York',
       };
 
-      mockRepository.findOne.mockResolvedValue(existingUser);
-      mockRepository.save.mockImplementation((user) => Promise.resolve(user));
+      mockUserRepository.findOne.mockResolvedValue(existingUser);
+      mockUserRepository.save.mockImplementation((user) =>
+        Promise.resolve(user),
+      );
+      mockScheduledNotificationRepository.findOne.mockResolvedValue(
+        existingNotification,
+      );
+      mockScheduledNotificationRepository.save.mockResolvedValue(
+        existingNotification,
+      );
 
       await service.updateUser('1', dto);
 
-      expect(mockRepository.findOne).toHaveBeenCalled();
-      expect(mockRepository.save).toHaveBeenCalled();
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      const savedUser = mockRepository.save.mock.calls[0][0] as User;
-      expect(savedUser.nextBirthdayUtc).toBeDefined();
-      expect(savedUser.nextBirthdayUtc).toBeInstanceOf(Date);
-      expect(savedUser.nextBirthdayUtc).not.toEqual(originalNextBirthday);
+      expect(mockUserRepository.findOne).toHaveBeenCalled();
+      expect(mockUserRepository.save).toHaveBeenCalled();
+      expect(mockScheduledNotificationRepository.findOne).toHaveBeenCalled();
+      expect(mockScheduledNotificationRepository.save).toHaveBeenCalled();
     });
 
-    it('should recalculate nextBirthdayUtc when both birthDate and timezone change', async () => {
-      const originalNextBirthday = new Date('2026-06-15T09:00:00Z');
+    it('should update notification scheduledFor when both birthDate and timezone change', async () => {
       const existingUser: User = {
         id: 1,
         firstName: 'John',
@@ -242,7 +312,15 @@ describe('UsersService', () => {
         birthDate: new Date('1990-06-15'),
         location: 'Sydney',
         timezone: 'Australia/Sydney',
-        nextBirthdayUtc: originalNextBirthday,
+      };
+
+      const existingNotification: ScheduledNotification = {
+        id: 1,
+        userId: 1,
+        type: 'birthday',
+        scheduledFor: new Date('2026-06-15T09:00:00Z'),
+        status: 'pending',
+        user: existingUser,
       };
 
       const dto: UserUpdateDTO = {
@@ -250,19 +328,23 @@ describe('UsersService', () => {
         timezone: 'Europe/London',
       };
 
-      mockRepository.findOne.mockResolvedValue(existingUser);
-      mockRepository.save.mockImplementation((user) => Promise.resolve(user));
+      mockUserRepository.findOne.mockResolvedValue(existingUser);
+      mockUserRepository.save.mockImplementation((user) =>
+        Promise.resolve(user),
+      );
+      mockScheduledNotificationRepository.findOne.mockResolvedValue(
+        existingNotification,
+      );
+      mockScheduledNotificationRepository.save.mockResolvedValue(
+        existingNotification,
+      );
 
       await service.updateUser('1', dto);
 
-      expect(mockRepository.findOne).toHaveBeenCalled();
-      expect(mockRepository.save).toHaveBeenCalled();
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      const savedUser = mockRepository.save.mock.calls[0][0] as User;
-      expect(savedUser.nextBirthdayUtc).toBeDefined();
-      expect(savedUser.nextBirthdayUtc).toBeInstanceOf(Date);
-      expect(savedUser.nextBirthdayUtc).not.toEqual(originalNextBirthday);
+      expect(mockUserRepository.findOne).toHaveBeenCalled();
+      expect(mockUserRepository.save).toHaveBeenCalled();
+      expect(mockScheduledNotificationRepository.findOne).toHaveBeenCalled();
+      expect(mockScheduledNotificationRepository.save).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when user does not exist', async () => {
@@ -270,16 +352,16 @@ describe('UsersService', () => {
         firstName: 'Jane',
       };
 
-      mockRepository.findOne.mockResolvedValue(null);
+      mockUserRepository.findOne.mockResolvedValue(null);
 
       await expect(service.updateUser('999', dto)).rejects.toThrow(
         NotFoundException,
       );
 
-      expect(mockRepository.findOne).toHaveBeenCalledWith({
+      expect(mockUserRepository.findOne).toHaveBeenCalledWith({
         where: { id: 999 },
       });
-      expect(mockRepository.save).not.toHaveBeenCalled();
+      expect(mockUserRepository.save).not.toHaveBeenCalled();
     });
   });
 });

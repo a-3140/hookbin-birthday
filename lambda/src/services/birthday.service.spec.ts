@@ -1,22 +1,25 @@
 import { BirthdayService } from './birthday.service';
 import { DatabaseService } from './database.service';
-import { User } from '@shared/entities';
+import { ScheduledNotification, User } from '@shared/entities';
 import { Repository } from 'typeorm';
 
 jest.mock('./database.service');
 
 describe('BirthdayService', () => {
   let service: BirthdayService;
-  let mockUserRepo: jest.Mocked<Repository<User>>;
+  let mockScheduledNotificationRepo: jest.Mocked<
+    Repository<ScheduledNotification>
+  >;
 
   beforeEach(async () => {
-    mockUserRepo = {
+    mockScheduledNotificationRepo = {
       find: jest.fn(),
-      save: jest.fn(),
-    } as unknown as jest.Mocked<Repository<User>>;
+    } as unknown as jest.Mocked<Repository<ScheduledNotification>>;
 
     const mockDbService = {
-      getUserRepository: jest.fn().mockReturnValue(mockUserRepo),
+      getScheduledNotificationRepository: jest
+        .fn()
+        .mockReturnValue(mockScheduledNotificationRepo),
     };
 
     (DatabaseService.getInstance as jest.Mock).mockResolvedValue(mockDbService);
@@ -29,29 +32,55 @@ describe('BirthdayService', () => {
     jest.clearAllMocks();
   });
 
-  describe('calculateNextBirthday', () => {
-    it('should calculate next birthday at 9am in user timezone converted to UTC', () => {
-      const user = new User();
-      user.id = 1;
-      user.firstName = 'John';
-      user.lastName = 'Doe';
-      user.birthDate = new Date('1990-12-25');
-      user.timezone = 'Australia/Sydney';
-      user.location = 'Sydney';
-      user.nextBirthdayUtc = new Date();
+  describe('getPendingNotifications', () => {
+    it('should fetch pending birthday notifications with user relation', async () => {
+      const from = new Date('2025-01-01T09:00:00Z');
+      const to = new Date('2025-01-01T10:00:00Z');
 
-      const now = new Date('2025-01-15T10:00:00Z');
-      jest.useFakeTimers();
-      jest.setSystemTime(now);
+      const user: Partial<User> = {
+        id: 1,
+        firstName: 'John',
+        lastName: 'Doe',
+        birthDate: new Date('1990-12-25'),
+        timezone: 'Australia/Sydney',
+        location: 'Sydney',
+      };
 
-      const result = service.calculateNextBirthday(user);
+      const notification: Partial<ScheduledNotification> = {
+        id: 1,
+        userId: 1,
+        type: 'birthday',
+        scheduledFor: new Date('2025-01-01T09:30:00Z'),
+        status: 'pending',
+        user: user as User,
+      };
 
-      expect(result).toBeInstanceOf(Date);
-      expect(result.getMonth()).toBe(11);
-      expect(result.getDate()).toBe(25);
-      expect(result.getFullYear()).toBe(2025);
+      mockScheduledNotificationRepo.find.mockResolvedValue([
+        notification as ScheduledNotification,
+      ]);
 
-      jest.useRealTimers();
+      const result = await service.getPendingNotifications(from, to);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual(notification);
+      expect(mockScheduledNotificationRepo.find).toHaveBeenCalledWith({
+        where: {
+          scheduledFor: expect.anything(),
+          status: 'pending',
+        },
+        relations: ['user'],
+      });
+    });
+
+    it('should return empty array when no pending notifications', async () => {
+      const from = new Date('2025-01-01T09:00:00Z');
+      const to = new Date('2025-01-01T10:00:00Z');
+
+      mockScheduledNotificationRepo.find.mockResolvedValue([]);
+
+      const result = await service.getPendingNotifications(from, to);
+
+      expect(result).toHaveLength(0);
     });
   });
 });
