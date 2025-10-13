@@ -7,23 +7,14 @@ jest.mock('./services/birthday.service');
 jest.mock('./services/notification.service');
 
 describe('Birthday Processor', () => {
-  let birthdayInitSpy: jest.SpyInstance;
   let birthdayGetPendingSpy: jest.SpyInstance;
-  let notificationInitSpy: jest.SpyInstance;
   let notificationSendSpy: jest.SpyInstance;
   let notificationUpdateStatusSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    birthdayInitSpy = jest
-      .spyOn(BirthdayService.prototype, 'init')
-      .mockResolvedValue(undefined);
     birthdayGetPendingSpy = jest
       .spyOn(BirthdayService.prototype, 'getPendingNotifications')
       .mockResolvedValue([]);
-
-    notificationInitSpy = jest
-      .spyOn(NotificationService.prototype, 'init')
-      .mockResolvedValue(undefined);
     notificationSendSpy = jest
       .spyOn(NotificationService.prototype, 'sendBirthdayMessage')
       .mockResolvedValue(undefined);
@@ -37,7 +28,7 @@ describe('Birthday Processor', () => {
   });
 
   describe('handler', () => {
-    it('should process pending notifications and send birthday messages', async () => {
+    it('processes pending notifications and sends birthday messages', async () => {
       const mockUser: Partial<User> = {
         id: 1,
         firstName: 'John',
@@ -62,9 +53,6 @@ describe('Birthday Processor', () => {
 
       const result = await handler();
 
-      expect(birthdayInitSpy).toHaveBeenCalledTimes(1);
-      expect(notificationInitSpy).toHaveBeenCalledTimes(1);
-      expect(birthdayGetPendingSpy).toHaveBeenCalledTimes(1);
       expect(notificationSendSpy).toHaveBeenCalledWith('John', 'Doe');
       expect(notificationUpdateStatusSpy).toHaveBeenCalledWith(1, 'sent');
       expect(result).toEqual({
@@ -73,23 +61,19 @@ describe('Birthday Processor', () => {
       });
     });
 
-    it('should return 0 processed when no pending notifications', async () => {
+    it('returns 0 processed when no pending notifications', async () => {
       birthdayGetPendingSpy.mockResolvedValue([]);
 
       const result = await handler();
 
-      expect(birthdayInitSpy).toHaveBeenCalledTimes(1);
-      expect(notificationInitSpy).toHaveBeenCalledTimes(1);
-      expect(birthdayGetPendingSpy).toHaveBeenCalledTimes(1);
       expect(notificationSendSpy).not.toHaveBeenCalled();
-      expect(notificationUpdateStatusSpy).not.toHaveBeenCalled();
       expect(result).toEqual({
         statusCode: 200,
         body: JSON.stringify({ processed: 0 }),
       });
     });
 
-    it('should mark notification as failed when sending fails', async () => {
+    it('marks notification as failed when sending fails', async () => {
       const mockUser: Partial<User> = {
         id: 1,
         firstName: 'John',

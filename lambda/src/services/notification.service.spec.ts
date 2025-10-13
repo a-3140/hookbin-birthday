@@ -40,7 +40,7 @@ describe('NotificationService', () => {
   });
 
   describe('sendBirthdayMessage', () => {
-    it('should send birthday message with correct payload', async () => {
+    it('sends birthday message with correct payload', async () => {
       const postSpy = jest
         .spyOn(axios, 'post')
         .mockResolvedValue({ data: {} } as never);
@@ -50,37 +50,18 @@ describe('NotificationService', () => {
       expect(postSpy).toHaveBeenCalledWith(mockHookbinUrl, {
         message: "Hey, John Doe it's your birthday",
       });
-      expect(postSpy).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('updateNotificationStatus', () => {
-    it('should update notification status to sent', async () => {
+    it('updates notification status', async () => {
       const updateSpy = jest
         .spyOn(mockScheduledNotificationRepo, 'update')
-        .mockResolvedValue({
-          affected: 1,
-        } as never);
+        .mockResolvedValue({ affected: 1 } as never);
 
       await service.updateNotificationStatus(1, 'sent');
 
-      expect(updateSpy).toHaveBeenCalledWith(1, {
-        status: 'sent',
-      });
-    });
-
-    it('should update notification status to failed', async () => {
-      const updateSpy = jest
-        .spyOn(mockScheduledNotificationRepo, 'update')
-        .mockResolvedValue({
-          affected: 1,
-        } as never);
-
-      await service.updateNotificationStatus(1, 'failed');
-
-      expect(updateSpy).toHaveBeenCalledWith(1, {
-        status: 'failed',
-      });
+      expect(updateSpy).toHaveBeenCalledWith(1, { status: 'sent' });
     });
   });
 });

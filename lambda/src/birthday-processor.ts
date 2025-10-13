@@ -23,8 +23,10 @@ export const handler = async (): Promise<LambdaResponse> => {
     `Checking for birthdays between ${from15MinAgo.toISOString()} and ${now.toISOString()}`,
   );
 
-  const notifications =
-    await birthdayService.getPendingNotifications(from15MinAgo, now);
+  const notifications = await birthdayService.getPendingNotifications(
+    from15MinAgo,
+    now,
+  );
 
   console.log(`Found ${notifications.length} pending birthday notifications`);
 
@@ -34,6 +36,11 @@ export const handler = async (): Promise<LambdaResponse> => {
 
   for (const notification of notifications) {
     try {
+      await notificationService.updateNotificationStatus(
+        notification.id,
+        'sent',
+      );
+
       await notificationService.sendBirthdayMessage(
         notification.user.firstName,
         notification.user.lastName,
@@ -43,13 +50,19 @@ export const handler = async (): Promise<LambdaResponse> => {
         `Birthday message sent for user ${notification.user.id} (notification ${notification.id})`,
       );
 
-      await notificationService.updateNotificationStatus(notification.id, 'sent');
+      await notificationService.updateNotificationStatus(
+        notification.id,
+        'sent',
+      );
     } catch (error) {
       console.error(
         `Failed to process notification ${notification.id}:`,
         error,
       );
-      await notificationService.updateNotificationStatus(notification.id, 'failed');
+      await notificationService.updateNotificationStatus(
+        notification.id,
+        'failed',
+      );
     }
   }
 

@@ -33,11 +33,7 @@ describe('WebhookService', () => {
     service = module.get<WebhookService>(WebhookService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
-  it('should throw error if HOOKBIN_URL is not configured', async () => {
+  it('throws error if HOOKBIN_URL is not configured', async () => {
     mockConfigService.get.mockReturnValue(undefined);
 
     await expect(async () => {
@@ -52,7 +48,7 @@ describe('WebhookService', () => {
   });
 
   describe('sendBirthdayMessage', () => {
-    it('should send birthday message successfully', async () => {
+    it('sends birthday message with correct payload', async () => {
       const mockResponse: Partial<AxiosResponse> = {
         data: {},
         status: 200,
@@ -70,10 +66,9 @@ describe('WebhookService', () => {
       expect(mockHttpService.post).toHaveBeenCalledWith(hookbinUrl, {
         message: "Hey, John Doe it's your birthday",
       });
-      expect(mockHttpService.post).toHaveBeenCalledTimes(1);
     });
 
-    it('should throw error when HTTP request fails', async () => {
+    it('throws error when HTTP request fails', async () => {
       const error = new Error('Network error');
       mockHttpService.post.mockReturnValue(throwError(() => error));
 

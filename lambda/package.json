@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "scripts": {
     "build": "webpack --mode production",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "lint": "eslint \"src/**/*.ts\" --fix",
     "package": "cd dist && zip -r function.zip .",
     "test": "jest",
     "test:watch": "jest --watch"
