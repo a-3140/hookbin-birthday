@@ -29,4 +29,20 @@ export class NotificationService {
   ) {
     await this.scheduledNotificationRepo.update(notificationId, { status });
   }
+
+  async incrementAttempts(notificationId: number): Promise<void> {
+    await this.scheduledNotificationRepo.increment(
+      { id: notificationId },
+      'attempts',
+      1,
+    );
+  }
+
+  async getAttempts(notificationId: number): Promise<number> {
+    const notification = await this.scheduledNotificationRepo.findOne({
+      where: { id: notificationId },
+      select: ['attempts'],
+    });
+    return notification?.attempts || 0;
+  }
 }

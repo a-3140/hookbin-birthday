@@ -19,7 +19,7 @@ services:
     image: localstack/localstack:latest
     container_name: boomering-localstack
     environment:
-      SERVICES: lambda,events,logs
+      SERVICES: lambda,events,logs,sqs
       DEBUG: 1
       LAMBDA_EXECUTOR: docker-reuse
       DOCKER_HOST: unix:///var/run/docker.sock

@@ -1,4 +1,7 @@
-.PHONY: up down build-lambda deploy-lambda invoke-lambda logs clean setup restart
+.PHONY: up down build-lambda deploy-lambda invoke-producer invoke-consumer logs-producer logs-consumer queue-status purge-queue clean setup restart
+
+ENDPOINT=http://localhost:4566
+REGION=us-east-1
 
 up:
 	docker-compose up -d
@@ -15,18 +18,57 @@ deploy-lambda:
 
 setup: up build-lambda deploy-lambda
 
-invoke-lambda:
-	@aws --endpoint-url=http://localhost:4566 lambda invoke \
-		--function-name birthday-processor \
+invoke-producer:
+	@echo "Invoking producer lambda..."
+	@aws --endpoint-url=$(ENDPOINT) lambda invoke \
+		--function-name birthday-producer \
 		--log-type Tail \
-		/tmp/lambda-output.json \
+		/tmp/producer-output.json \
 		--query 'LogResult' \
 		--output text | base64 -d
-	@cat /tmp/lambda-output.json
+	@echo "\nResponse:"
+	@cat /tmp/producer-output.json
 
-logs:
-	@aws --endpoint-url=http://localhost:4566 logs tail \
-		/aws/lambda/birthday-processor --follow
+invoke-consumer:
+	@echo "Invoking consumer lambda..."
+	@aws --endpoint-url=$(ENDPOINT) lambda invoke \
+		--function-name birthday-consumer \
+		--log-type Tail \
+		/tmp/consumer-output.json \
+		--query 'LogResult' \
+		--output text | base64 -d
+	@echo "\nResponse:"
+	@cat /tmp/consumer-output.json
+
+logs-producer:
+	@aws --endpoint-url=$(ENDPOINT) logs tail \
+		/aws/lambda/birthday-producer --follow
+
+logs-consumer:
+	@aws --endpoint-url=$(ENDPOINT) logs tail \
+		/aws/lambda/birthday-consumer --follow
+
+queue-status:
+	@echo "Queue Status:"
+	@aws --endpoint-url=$(ENDPOINT) --region $(REGION) sqs get-queue-attributes \
+		--queue-url $(ENDPOINT)/000000000000/birthday-notifications-queue \
+		--attribute-names All \
+		--query 'Attributes.{Messages:ApproximateNumberOfMessages,InFlight:ApproximateNumberOfMessagesNotVisible,Delayed:ApproximateNumberOfMessagesDelayed}' \
+		--output table
+	@echo "\nDLQ Status:"
+	@aws --endpoint-url=$(ENDPOINT) --region $(REGION) sqs get-queue-attributes \
+		--queue-url $(ENDPOINT)/000000000000/birthday-notifications-dlq \
+		--attribute-names All \
+		--query 'Attributes.{Messages:ApproximateNumberOfMessages}' \
+		--output table
+
+purge-queue:
+	@echo "Purging main queue..."
+	@aws --endpoint-url=$(ENDPOINT) --region $(REGION) sqs purge-queue \
+		--queue-url $(ENDPOINT)/000000000000/birthday-notifications-queue
+	@echo "Purging DLQ..."
+	@aws --endpoint-url=$(ENDPOINT) --region $(REGION) sqs purge-queue \
+		--queue-url $(ENDPOINT)/000000000000/birthday-notifications-dlq
 
 clean:
 	rm -rf lambda/dist

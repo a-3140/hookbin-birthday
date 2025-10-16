@@ -10,10 +10,13 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@aws-sdk/client-sqs": "^3.705.0",
     "aws-lambda": "^1.0.7",
+    "aws-sdk": "^2.1692.0",
     "axios": "^1.12.2",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
+    "dotenv": "^16.4.5",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "typeorm": "^0.3.27"

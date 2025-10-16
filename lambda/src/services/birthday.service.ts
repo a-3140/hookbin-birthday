@@ -1,4 +1,4 @@
-import { Between, Repository } from 'typeorm';
+import { Between, Repository, In } from 'typeorm';
 import { ScheduledNotification } from '@shared/entities';
 import { DatabaseService } from './database.service';
 
@@ -18,5 +18,14 @@ export class BirthdayService {
       },
       relations: ['user'],
     });
+  }
+
+  async markAsProcessing(notificationIds: number[]): Promise<void> {
+    if (notificationIds.length === 0) return;
+
+    await this.scheduledNotificationRepo.update(
+      { id: In(notificationIds) },
+      { status: 'processing' },
+    );
   }
 }

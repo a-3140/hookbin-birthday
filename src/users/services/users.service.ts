@@ -147,8 +147,8 @@ export class UsersService {
     let nextBirthday = setMonth(now, birthMonth);
     nextBirthday = setDate(nextBirthday, birthDay);
     // hour is the time of day
-    nextBirthday = setHours(nextBirthday, 3);
-    nextBirthday = setMinutes(nextBirthday, 13);
+    nextBirthday = setHours(nextBirthday, 9);
+    nextBirthday = setMinutes(nextBirthday, 0);
     nextBirthday = setSeconds(nextBirthday, 0);
     nextBirthday = setMilliseconds(nextBirthday, 0);
 

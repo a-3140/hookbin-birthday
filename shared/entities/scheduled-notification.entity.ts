@@ -10,6 +10,7 @@ import { User } from './user.entity';
 
 @Entity('scheduled_notification')
 @Index(['userId', 'type'], { unique: true })
+@Index(['scheduledFor', 'status'])
 export class ScheduledNotification {
   @PrimaryGeneratedColumn()
   id: number;
@@ -29,4 +30,7 @@ export class ScheduledNotification {
 
   @Column({ type: 'varchar', length: 20, default: 'pending' })
   status: string;
+
+  @Column({ type: 'int', default: 0 })
+  attempts: number;
 }

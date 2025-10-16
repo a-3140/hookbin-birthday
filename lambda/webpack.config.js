@@ -1,7 +1,10 @@
 const path = require('path');
 
 module.exports = {
-  entry: './src/birthday-processor.ts',
+  entry: {
+    'birthday-producer': './src/birthday-producer.ts',
+    'birthday-consumer': './src/birthday-consumer.ts',
+  },
   target: 'node',
   mode: 'production',
   module: {
@@ -20,7 +23,7 @@ module.exports = {
     },
   },
   output: {
-    filename: 'index.js',
+    filename: '[name].js',
     path: path.resolve(__dirname, 'dist'),
     libraryTarget: 'commonjs2',
   },
